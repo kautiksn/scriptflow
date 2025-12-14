@@ -86,7 +86,7 @@ export async function createVideo(formData: FormData) {
 
     const projectId = formData.get('projectId') as string
     const title = formData.get('title') as string
-    const youtubeUrl = formData.get('youtubeUrl') as string
+    const thumbnailUrl = formData.get('thumbnailUrl') as string
 
     if (!projectId || !title) {
         return { error: 'Project ID and title are required' }
@@ -102,7 +102,8 @@ export async function createVideo(formData: FormData) {
         data: {
             projectId,
             title,
-            youtubeUrl: youtubeUrl || '',
+            youtubeUrl: '',
+            thumbnailUrl: thumbnailUrl || null,
             displayOrder: (lastVideo?.displayOrder ?? -1) + 1,
         },
     })

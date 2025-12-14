@@ -464,14 +464,15 @@ export function DashboardContent({ user, projects }: DashboardContentProps) {
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-[#1A1A1A] mb-1.5">
-                                                YouTube URL <span className="text-[#A3A3A3] font-normal">(optional)</span>
+                                                Thumbnail Image URL <span className="text-[#A3A3A3] font-normal">(optional)</span>
                                             </label>
                                             <input
                                                 type="url"
-                                                name="youtubeUrl"
-                                                placeholder="https://youtube.com/watch?v=..."
+                                                name="thumbnailUrl"
+                                                placeholder="https://example.com/image.jpg"
                                                 className="w-full px-4 py-2.5 text-sm bg-[#FAFAFA] border border-[#E5E5E5] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A]"
                                             />
+                                            <p className="mt-1 text-xs text-[#A3A3A3]">Direct image link (jpg, png, webp)</p>
                                         </div>
                                     </div>
                                     <button
