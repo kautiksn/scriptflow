@@ -59,7 +59,7 @@ export function VideoContent({ video, user }: VideoContentProps) {
     )
 
     const { selection, clearSelection } = useTextSelection()
-    const { identity, showPrompt, setIdentity, hidePrompt } = useCommenterIdentity()
+    const { identity, showPrompt, setIdentity, hidePrompt, promptForIdentity } = useCommenterIdentity()
 
     const activeTab = video.tabs.find(t => t.id === activeTabId)
     const activeTabComments = comments.filter(c =>
@@ -68,17 +68,26 @@ export function VideoContent({ video, user }: VideoContentProps) {
     )
 
     const handleCommentClick = useCallback(() => {
-        if (!identity) {
-            // Show name prompt first
-            return
-        }
         if (selection) {
             setActiveBlockId(selection.blockId)
             setActiveSelectedText(selection.text)
-            setIsSidebarOpen(true)
+
+            if (!identity) {
+                // Show name prompt first, then open sidebar after identity is set
+                promptForIdentity()
+            } else {
+                setIsSidebarOpen(true)
+            }
             clearSelection()
         }
-    }, [selection, clearSelection, identity])
+    }, [selection, clearSelection, identity, promptForIdentity])
+
+    // Open sidebar after identity is set
+    useEffect(() => {
+        if (identity && activeBlockId && !isSidebarOpen) {
+            setIsSidebarOpen(true)
+        }
+    }, [identity, activeBlockId, isSidebarOpen])
 
     const handleAddComment = useCallback(async (commentData: {
         blockId: string
@@ -160,24 +169,6 @@ export function VideoContent({ video, user }: VideoContentProps) {
                 </div>
             </motion.header>
 
-            {/* YouTube Embed */}
-            <div className="max-w-6xl mx-auto px-6 py-6">
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.98 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.4, ease: 'easeOut' }}
-                    className="aspect-video rounded-xl overflow-hidden bg-black shadow-lg"
-                >
-                    <iframe
-                        src={getYouTubeEmbedUrl(video.youtubeUrl)}
-                        title={video.title}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                        className="w-full h-full"
-                    />
-                </motion.div>
-            </div>
-
             {/* Tab Bar */}
             <div className="max-w-6xl mx-auto px-6">
                 <TabBar
@@ -203,7 +194,7 @@ export function VideoContent({ video, user }: VideoContentProps) {
             </main>
 
             {/* Floating comment trigger */}
-            {selection && identity && (
+            {selection && (
                 <CommentTrigger rect={selection.rect} onClick={handleCommentClick} />
             )}
 
