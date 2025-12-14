@@ -15,9 +15,11 @@ interface Tab {
 interface Comment {
     id: string
     blockId: string
+    selectedText?: string | null
     text: string
     authorName: string
     authorColor: string
+    createdAt?: Date
 }
 
 interface TabContentProps {
@@ -54,6 +56,7 @@ export function TabContent({ tab, comments, isAdmin }: TabContentProps) {
                             notes?: string
                         }>) || [],
                     }}
+                    comments={comments}
                 />
             )}
 
