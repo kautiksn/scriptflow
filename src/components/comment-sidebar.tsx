@@ -11,6 +11,7 @@ interface Comment {
     selectedText: string
     author: string
     timestamp: string
+    color?: string
 }
 
 interface CommentSidebarProps {
@@ -20,6 +21,7 @@ interface CommentSidebarProps {
     selectedText: string
     comments: Comment[]
     onAddComment: (comment: Omit<Comment, 'id' | 'timestamp'>) => void
+    authorColor?: string
 }
 
 export function CommentSidebar({
@@ -29,6 +31,7 @@ export function CommentSidebar({
     selectedText,
     comments,
     onAddComment,
+    authorColor = '#1A1A1A',
 }: CommentSidebarProps) {
     const [commentText, setCommentText] = useState('')
     const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -49,6 +52,7 @@ export function CommentSidebar({
             text: commentText.trim(),
             selectedText,
             author: 'Client',
+            color: authorColor,
         })
         setCommentText('')
     }
@@ -141,9 +145,16 @@ export function CommentSidebar({
                                             className="p-4 bg-[#FAFAFA] rounded-lg border border-[#E5E5E5]"
                                         >
                                             <div className="flex items-center justify-between mb-2">
-                                                <span className="text-sm font-medium text-[#1A1A1A]">
-                                                    {comment.author}
-                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    {/* Color indicator */}
+                                                    <div
+                                                        className="w-3 h-3 rounded-full"
+                                                        style={{ backgroundColor: comment.color || '#1A1A1A' }}
+                                                    />
+                                                    <span className="text-sm font-medium text-[#1A1A1A]">
+                                                        {comment.author}
+                                                    </span>
+                                                </div>
                                                 <span className="text-xs text-[#A3A3A3]">{comment.timestamp}</span>
                                             </div>
                                             {comment.selectedText && (

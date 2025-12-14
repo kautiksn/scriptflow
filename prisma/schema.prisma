@@ -1,0 +1,102 @@
+// ScriptFlow Database Schema
+// Neon Postgres via Prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Users - KRTVA members and clients
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  name         String
+  passwordHash String    @map("password_hash")
+  role         Role      @default(client)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  projects     Project[]
+
+  @@map("users")
+}
+
+enum Role {
+  krtva
+  client
+}
+
+// Projects - client video collections
+model Project {
+  id        String   @id @default(uuid())
+  title     String
+  clientId  String   @map("client_id")
+  client    User     @relation(fields: [clientId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+  videos    Video[]
+
+  @@map("projects")
+}
+
+// Videos - YouTube embeds per project
+model Video {
+  id           String   @id @default(uuid())
+  projectId    String   @map("project_id")
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  youtubeUrl   String   @map("youtube_url")
+  title        String
+  thumbnailUrl String?  @map("thumbnail_url")
+  displayOrder Int      @default(0) @map("display_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  tabs         Tab[]
+
+  @@map("videos")
+}
+
+// Tabs - content sections per video
+model Tab {
+  id           String    @id @default(uuid())
+  videoId      String    @map("video_id")
+  video        Video     @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  tabType      TabType   @map("tab_type")
+  title        String
+  content      Json      @default("{}")
+  displayOrder Int       @default(0) @map("display_order")
+  comments     Comment[]
+
+  @@map("tabs")
+}
+
+enum TabType {
+  overview
+  preproduction
+  script
+  moodboard
+}
+
+// Comments - anchored to tab + block
+model Comment {
+  id           String   @id @default(uuid())
+  tabId        String   @map("tab_id")
+  tab          Tab      @relation(fields: [tabId], references: [id], onDelete: Cascade)
+  blockId      String   @map("block_id")
+  selectedText String?  @map("selected_text")
+  text         String
+  authorName   String   @map("author_name")
+  authorColor  String   @map("author_color")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("comments")
+}
+
+// Commenter identity - synced from localStorage
+model Commenter {
+  browserId String   @id @map("browser_id")
+  name      String
+  color     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("commenters")
+}
