@@ -1,65 +1,108 @@
-import Image from "next/image";
+'use client'
+
+import { Suspense, useState, useCallback } from 'react'
+import { ScriptView } from '@/components/script-view'
+import { CommentTrigger } from '@/components/comment-trigger'
+import { CommentSidebar } from '@/components/comment-sidebar'
+import { ApprovalFooter } from '@/components/approval-footer'
+import { useTextSelection } from '@/hooks/use-text-selection'
+import { useAccessMode } from '@/hooks/use-access-mode'
+import { sampleScript } from '@/lib/sample-script'
+
+interface Comment {
+  id: string
+  blockId: string
+  text: string
+  selectedText: string
+  author: string
+  timestamp: string
+}
+
+function ScriptFlowContent() {
+  const accessMode = useAccessMode()
+  const { selection, clearSelection } = useTextSelection()
+
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [activeBlockId, setActiveBlockId] = useState<string | null>(null)
+  const [activeSelectedText, setActiveSelectedText] = useState('')
+  const [comments, setComments] = useState<Comment[]>([
+    {
+      id: 'comment-1',
+      blockId: 'block-2',
+      text: 'Love this line — very evocative. Could we explore "ritual" as the central theme throughout?',
+      selectedText: 'Some mornings demand more than coffee.',
+      author: 'Sarah (Client)',
+      timestamp: '2 hours ago',
+    },
+  ])
+
+  const handleCommentClick = useCallback(() => {
+    if (selection) {
+      setActiveBlockId(selection.blockId)
+      setActiveSelectedText(selection.text)
+      setIsSidebarOpen(true)
+      clearSelection()
+    }
+  }, [selection, clearSelection])
+
+  const handleCloseSidebar = useCallback(() => {
+    setIsSidebarOpen(false)
+    setActiveBlockId(null)
+    setActiveSelectedText('')
+  }, [])
+
+  const handleAddComment = useCallback((comment: Omit<Comment, 'id' | 'timestamp'>) => {
+    const newComment: Comment = {
+      ...comment,
+      id: `comment-${Date.now()}`,
+      timestamp: 'Just now',
+    }
+    setComments((prev) => [...prev, newComment])
+  }, [])
+
+  const handleRequestChanges = useCallback(() => {
+    // In a real app, this would submit all comments and mark the script for revision
+    alert('Request for changes submitted! The production team will be notified.')
+  }, [])
+
+  const handleApprove = useCallback(() => {
+    // In a real app, this would mark the script as approved in Supabase
+    alert('Script approved! The production team will proceed with this version.')
+  }, [])
+
+  return (
+    <>
+      <ScriptView script={sampleScript} />
+
+      {/* Floating comment trigger */}
+      {selection && (
+        <CommentTrigger rect={selection.rect} onClick={handleCommentClick} />
+      )}
+
+      {/* Comment sidebar */}
+      <CommentSidebar
+        isOpen={isSidebarOpen}
+        onClose={handleCloseSidebar}
+        blockId={activeBlockId}
+        selectedText={activeSelectedText}
+        comments={comments}
+        onAddComment={handleAddComment}
+      />
+
+      {/* Approval footer */}
+      <ApprovalFooter
+        onRequestChanges={handleRequestChanges}
+        onApprove={handleApprove}
+        isAdmin={accessMode === 'admin'}
+      />
+    </>
+  )
+}
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+    <Suspense fallback={<div className="min-h-screen bg-[#FAFAFA]" />}>
+      <ScriptFlowContent />
+    </Suspense>
+  )
 }
