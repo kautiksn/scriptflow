@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Edit2 } from 'lucide-react'
+import { ArrowLeft, Edit2, Type, Grid3X3 } from 'lucide-react'
 import { logout } from '@/app/actions/auth'
 import { createComment, updateTabContent } from '@/app/actions/admin'
 import { TabBar } from '@/components/tab-bar'
@@ -12,6 +12,7 @@ import { TabContent } from '@/components/tab-content'
 import { CommentDialog } from '@/components/comment-dialog'
 import { CommentTrigger } from '@/components/comment-trigger'
 import { ScriptEditor } from '@/components/script-editor'
+import { TextScriptEditor } from '@/components/text-script-editor'
 import { useTextSelection } from '@/hooks/use-text-selection'
 
 interface Tab {
@@ -45,7 +46,6 @@ interface VideoContentProps {
     user: { id: string; name: string; role: string }
 }
 
-// Curated color palette for commenters
 const USER_COLORS = [
     '#3B82F6', '#10B981', '#F59E0B', '#EF4444',
     '#8B5CF6', '#EC4899', '#06B6D4', '#F97316',
@@ -74,20 +74,19 @@ export function VideoContent({ video, user }: VideoContentProps) {
     const [comments, setComments] = useState<Comment[]>(
         video.tabs.flatMap(tab => tab.comments)
     )
-    const [isEditorOpen, setIsEditorOpen] = useState(false)
+    const [isSceneEditorOpen, setIsSceneEditorOpen] = useState(false)
+    const [isTextEditorOpen, setIsTextEditorOpen] = useState(false)
 
     const { selection, clearSelection } = useTextSelection()
 
     const activeTab = video.tabs.find(t => t.id === activeTabId)
 
-    // Filter comments for current tab
     const activeTabComments = comments.filter(c => {
         const originalTabComment = activeTab?.comments.some(tc => tc.id === c.id)
         const newComment = (c as unknown as { tabId?: string }).tabId === activeTabId
         return originalTabComment || newComment
     })
 
-    // User color based on their name
     const userColor = getUserColor(user.name)
 
     const handleCommentClick = useCallback(() => {
@@ -106,7 +105,6 @@ export function VideoContent({ video, user }: VideoContentProps) {
     const handleSubmitComment = useCallback(async (text: string) => {
         if (!activeTabId || !activeBlockId) return
 
-        // Create optimistic comment
         const newComment: Comment = {
             id: `temp-${Date.now()}`,
             blockId: activeBlockId,
@@ -117,15 +115,11 @@ export function VideoContent({ video, user }: VideoContentProps) {
             createdAt: new Date(),
         }
 
-        // Add to local state immediately
         setComments(prev => [...prev, { ...newComment, tabId: activeTabId } as unknown as Comment])
-
-        // Close dialog
         setIsDialogOpen(false)
         setActiveBlockId(null)
         setActiveSelectedText('')
 
-        // Save to database
         const formData = new FormData()
         formData.append('tabId', activeTabId)
         formData.append('blockId', activeBlockId)
@@ -143,20 +137,24 @@ export function VideoContent({ video, user }: VideoContentProps) {
         setActiveSelectedText('')
     }, [])
 
-    const handleSaveScript = useCallback(async (blocks: ScriptBlock[]) => {
+    const handleSaveSceneScript = useCallback(async (blocks: ScriptBlock[]) => {
         if (!activeTab || activeTab.tabType !== 'script') return
+        await updateTabContent(activeTab.id, { blocks, mode: 'scenes' })
+        router.refresh()
+    }, [activeTab, router])
 
-        await updateTabContent(activeTab.id, { blocks })
+    const handleSaveTextScript = useCallback(async (content: { text: string; mode: 'text' }) => {
+        if (!activeTab || activeTab.tabType !== 'script') return
+        await updateTabContent(activeTab.id, content)
         router.refresh()
     }, [activeTab, router])
 
     const isAdmin = user.role === 'krtva'
     const isScriptTab = activeTab?.tabType === 'script'
 
-    // Get current script blocks for editor
-    const currentScriptBlocks = isScriptTab && activeTab
-        ? ((activeTab.content as { blocks?: ScriptBlock[] })?.blocks || [])
-        : []
+    const currentContent = activeTab?.content as { blocks?: ScriptBlock[]; text?: string; mode?: string } | undefined
+    const currentScriptBlocks = currentContent?.blocks || []
+    const currentScriptText = currentContent?.text || ''
 
     return (
         <div className="min-h-screen bg-[#FAFAFA]">
@@ -188,13 +186,22 @@ export function VideoContent({ video, user }: VideoContentProps) {
 
                         <div className="flex items-center gap-2">
                             {isAdmin && isScriptTab && (
-                                <button
-                                    onClick={() => setIsEditorOpen(true)}
-                                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all-200 animate-pulse-subtle"
-                                >
-                                    <Edit2 className="w-4 h-4" />
-                                    Edit Script
-                                </button>
+                                <>
+                                    <button
+                                        onClick={() => setIsTextEditorOpen(true)}
+                                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all-200"
+                                    >
+                                        <Type className="w-4 h-4" />
+                                        Edit Text
+                                    </button>
+                                    <button
+                                        onClick={() => setIsSceneEditorOpen(true)}
+                                        className="flex items-center gap-2 px-4 py-2 text-sm text-[#737373] border border-[#E5E5E5] rounded-lg hover:bg-[#F5F5F5] transition-all-200"
+                                    >
+                                        <Grid3X3 className="w-4 h-4" />
+                                        Edit Scenes
+                                    </button>
+                                </>
                             )}
                             <form action={logout}>
                                 <button
@@ -249,13 +256,24 @@ export function VideoContent({ video, user }: VideoContentProps) {
                 authorColor={userColor}
             />
 
-            {/* Script Editor */}
+            {/* Scene-based Script Editor */}
             {isAdmin && (
                 <ScriptEditor
-                    isOpen={isEditorOpen}
-                    onClose={() => setIsEditorOpen(false)}
-                    onSave={handleSaveScript}
+                    isOpen={isSceneEditorOpen}
+                    onClose={() => setIsSceneEditorOpen(false)}
+                    onSave={handleSaveSceneScript}
                     initialBlocks={currentScriptBlocks}
+                    title={`Edit Scenes: ${activeTab?.title || 'Script'}`}
+                />
+            )}
+
+            {/* Text-based Script Editor */}
+            {isAdmin && (
+                <TextScriptEditor
+                    isOpen={isTextEditorOpen}
+                    onClose={() => setIsTextEditorOpen(false)}
+                    onSave={handleSaveTextScript}
+                    initialContent={currentScriptText}
                     title={`Edit: ${activeTab?.title || 'Script'}`}
                 />
             )}
