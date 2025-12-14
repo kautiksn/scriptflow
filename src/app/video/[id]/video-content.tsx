@@ -223,6 +223,7 @@ export function VideoContent({ video, user }: VideoContentProps) {
                     activeTabId={activeTabId}
                     onTabChange={setActiveTabId}
                     isAdmin={isAdmin}
+                    videoId={video.id}
                 />
             </div>
 
