@@ -1,17 +1,16 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Settings } from 'lucide-react'
+import { ArrowLeft, Settings } from 'lucide-react'
 import { logout } from '@/app/actions/auth'
+import { createComment } from '@/app/actions/admin'
 import { TabBar } from '@/components/tab-bar'
 import { TabContent } from '@/components/tab-content'
-import { CommentSidebar } from '@/components/comment-sidebar'
+import { CommentDialog } from '@/components/comment-dialog'
 import { CommentTrigger } from '@/components/comment-trigger'
-import { CommenterPrompt } from '@/components/commenter-prompt'
 import { useTextSelection } from '@/hooks/use-text-selection'
-import { useCommenterIdentity } from '@/hooks/use-commenter-identity'
 
 interface Tab {
     id: string
@@ -44,14 +43,21 @@ interface VideoContentProps {
     user: { id: string; name: string; role: string }
 }
 
-function getYouTubeEmbedUrl(url: string): string {
-    const videoId = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([^&\s?]+)/)?.[1]
-    return videoId ? `https://www.youtube.com/embed/${videoId}` : ''
+// Curated color palette for commenters
+const USER_COLORS = [
+    '#3B82F6', '#10B981', '#F59E0B', '#EF4444',
+    '#8B5CF6', '#EC4899', '#06B6D4', '#F97316',
+]
+
+function getUserColor(name: string): string {
+    const hash = name.split('').reduce((a, b) => a + b.charCodeAt(0), 0)
+    return USER_COLORS[hash % USER_COLORS.length]
 }
 
 export function VideoContent({ video, user }: VideoContentProps) {
     const [activeTabId, setActiveTabId] = useState(video.tabs[0]?.id || '')
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+    const [isDialogOpen, setIsDialogOpen] = useState(false)
+    const [dialogPosition, setDialogPosition] = useState({ x: 0, y: 0 })
     const [activeBlockId, setActiveBlockId] = useState<string | null>(null)
     const [activeSelectedText, setActiveSelectedText] = useState('')
     const [comments, setComments] = useState<Comment[]>(
@@ -59,70 +65,76 @@ export function VideoContent({ video, user }: VideoContentProps) {
     )
 
     const { selection, clearSelection } = useTextSelection()
-    const { identity, showPrompt, setIdentity, hidePrompt, promptForIdentity } = useCommenterIdentity()
 
     const activeTab = video.tabs.find(t => t.id === activeTabId)
-    const activeTabComments = comments.filter(c =>
-        activeTab?.comments.some(tc => tc.id === c.id) ||
-        (c as unknown as { tabId?: string }).tabId === activeTabId
-    )
+
+    // Filter comments for current tab
+    const activeTabComments = comments.filter(c => {
+        const originalTabComment = activeTab?.comments.some(tc => tc.id === c.id)
+        const newComment = (c as unknown as { tabId?: string }).tabId === activeTabId
+        return originalTabComment || newComment
+    })
+
+    // User color based on their name
+    const userColor = getUserColor(user.name)
 
     const handleCommentClick = useCallback(() => {
-        if (selection) {
+        if (selection && selection.rect) {
             setActiveBlockId(selection.blockId)
             setActiveSelectedText(selection.text)
-
-            if (!identity) {
-                // Show name prompt first, then open sidebar after identity is set
-                promptForIdentity()
-            } else {
-                setIsSidebarOpen(true)
-            }
+            setDialogPosition({
+                x: selection.rect.left,
+                y: selection.rect.bottom,
+            })
+            setIsDialogOpen(true)
             clearSelection()
         }
-    }, [selection, clearSelection, identity, promptForIdentity])
+    }, [selection, clearSelection])
 
-    // Open sidebar after identity is set
-    useEffect(() => {
-        if (identity && activeBlockId && !isSidebarOpen) {
-            setIsSidebarOpen(true)
-        }
-    }, [identity, activeBlockId, isSidebarOpen])
+    const handleSubmitComment = useCallback(async (text: string) => {
+        if (!activeTabId || !activeBlockId) return
 
-    const handleAddComment = useCallback(async (commentData: {
-        blockId: string
-        text: string
-        selectedText: string
-        author: string
-    }) => {
-        if (!identity) return
-
+        // Create optimistic comment
         const newComment: Comment = {
             id: `temp-${Date.now()}`,
-            blockId: commentData.blockId,
-            selectedText: commentData.selectedText,
-            text: commentData.text,
-            authorName: identity.name,
-            authorColor: identity.color,
+            blockId: activeBlockId,
+            selectedText: activeSelectedText,
+            text,
+            authorName: user.name,
+            authorColor: userColor,
             createdAt: new Date(),
         }
 
-        setComments(prev => [...prev, newComment])
+        // Add to local state immediately
+        setComments(prev => [...prev, { ...newComment, tabId: activeTabId } as unknown as Comment])
 
-        // TODO: Persist to database via server action
-    }, [identity])
+        // Close dialog
+        setIsDialogOpen(false)
+        setActiveBlockId(null)
+        setActiveSelectedText('')
+
+        // Save to database
+        const formData = new FormData()
+        formData.append('tabId', activeTabId)
+        formData.append('blockId', activeBlockId)
+        formData.append('text', text)
+        formData.append('selectedText', activeSelectedText)
+        formData.append('authorName', user.name)
+        formData.append('authorColor', userColor)
+
+        await createComment(formData)
+    }, [activeTabId, activeBlockId, activeSelectedText, user.name, userColor])
+
+    const handleCloseDialog = useCallback(() => {
+        setIsDialogOpen(false)
+        setActiveBlockId(null)
+        setActiveSelectedText('')
+    }, [])
 
     const isAdmin = user.role === 'krtva'
 
     return (
         <div className="min-h-screen bg-[#FAFAFA]">
-            {/* Commenter name prompt */}
-            <CommenterPrompt
-                isOpen={showPrompt}
-                onSubmit={setIdentity}
-                onClose={hidePrompt}
-            />
-
             {/* Header */}
             <motion.header
                 initial={{ opacity: 0, y: -20 }}
@@ -170,7 +182,7 @@ export function VideoContent({ video, user }: VideoContentProps) {
             </motion.header>
 
             {/* Tab Bar */}
-            <div className="max-w-6xl mx-auto px-6">
+            <div className="max-w-6xl mx-auto px-6 mt-6">
                 <TabBar
                     tabs={video.tabs.map(t => ({ id: t.id, title: t.title, type: t.tabType }))}
                     activeTabId={activeTabId}
@@ -198,26 +210,15 @@ export function VideoContent({ video, user }: VideoContentProps) {
                 <CommentTrigger rect={selection.rect} onClick={handleCommentClick} />
             )}
 
-            {/* Comment sidebar */}
-            <CommentSidebar
-                isOpen={isSidebarOpen}
-                onClose={() => setIsSidebarOpen(false)}
-                blockId={activeBlockId}
+            {/* Comment dialog */}
+            <CommentDialog
+                isOpen={isDialogOpen}
+                onClose={handleCloseDialog}
                 selectedText={activeSelectedText}
-                comments={activeTabComments.map(c => ({
-                    id: c.id,
-                    blockId: c.blockId,
-                    text: c.text,
-                    selectedText: c.selectedText || '',
-                    author: c.authorName,
-                    timestamp: new Date(c.createdAt).toLocaleDateString(),
-                    color: c.authorColor,
-                }))}
-                onAddComment={(comment) => handleAddComment({
-                    ...comment,
-                    author: identity?.name || 'Anonymous',
-                })}
-                authorColor={identity?.color}
+                position={dialogPosition}
+                onSubmit={handleSubmitComment}
+                authorName={user.name}
+                authorColor={userColor}
             />
         </div>
     )
