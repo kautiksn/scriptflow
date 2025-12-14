@@ -39,6 +39,7 @@ export function DashboardContent({ user, projects }: DashboardContentProps) {
     const [editingProject, setEditingProject] = useState<{ id: string; title: string } | null>(null)
     const [projectMenu, setProjectMenu] = useState<string | null>(null)
     const [videoMenu, setVideoMenu] = useState<string | null>(null)
+    const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'project' | 'video'; id: string; name: string } | null>(null)
     const [isSubmitting, setIsSubmitting] = useState(false)
 
     const isAdmin = user.role === 'krtva'
@@ -57,12 +58,9 @@ export function DashboardContent({ user, projects }: DashboardContentProps) {
         setShowNewVideo(null)
     }
 
-    async function handleDeleteProject(projectId: string) {
-        if (confirm('Are you sure you want to delete this project? All scripts will be deleted.')) {
-            await deleteProject(projectId)
-            setProjectMenu(null)
-            router.refresh()
-        }
+    async function handleDeleteProject(projectId: string, projectName: string) {
+        setDeleteConfirm({ type: 'project', id: projectId, name: projectName })
+        setProjectMenu(null)
     }
 
     async function handleUpdateProject(e: React.FormEvent) {
@@ -75,12 +73,22 @@ export function DashboardContent({ user, projects }: DashboardContentProps) {
         router.refresh()
     }
 
-    async function handleDeleteVideo(videoId: string) {
-        if (confirm('Are you sure you want to delete this script?')) {
-            await deleteVideo(videoId)
-            setVideoMenu(null)
-            router.refresh()
+    async function handleDeleteVideo(videoId: string, videoName: string) {
+        setDeleteConfirm({ type: 'video', id: videoId, name: videoName })
+        setVideoMenu(null)
+    }
+
+    async function confirmDelete() {
+        if (!deleteConfirm) return
+        setIsSubmitting(true)
+        if (deleteConfirm.type === 'project') {
+            await deleteProject(deleteConfirm.id)
+        } else {
+            await deleteVideo(deleteConfirm.id)
         }
+        setIsSubmitting(false)
+        setDeleteConfirm(null)
+        router.refresh()
     }
 
     return (
@@ -197,7 +205,7 @@ export function DashboardContent({ user, projects }: DashboardContentProps) {
                                                             Rename
                                                         </button>
                                                         <button
-                                                            onClick={() => handleDeleteProject(project.id)}
+                                                            onClick={() => handleDeleteProject(project.id, project.title)}
                                                             className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
@@ -286,7 +294,7 @@ export function DashboardContent({ user, projects }: DashboardContentProps) {
                                                                 onClick={(e) => e.stopPropagation()}
                                                             >
                                                                 <button
-                                                                    onClick={() => handleDeleteVideo(video.id)}
+                                                                    onClick={() => handleDeleteVideo(video.id, video.title)}
                                                                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
                                                                 >
                                                                     <Trash2 className="w-4 h-4" />
@@ -474,6 +482,61 @@ export function DashboardContent({ user, projects }: DashboardContentProps) {
                                         {isSubmitting ? 'Adding...' : 'Add Script'}
                                     </button>
                                 </form>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+
+            {/* Delete Confirmation Modal */}
+            <AnimatePresence>
+                {deleteConfirm && (
+                    <>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 bg-black/40 z-50"
+                            onClick={() => setDeleteConfirm(null)}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-sm"
+                        >
+                            <div className="bg-white rounded-xl border border-[#E5E5E5] shadow-2xl p-6">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                                        <Trash2 className="w-5 h-5 text-red-600" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-lg font-semibold text-[#1A1A1A]">
+                                            Delete {deleteConfirm.type === 'project' ? 'Project' : 'Script'}?
+                                        </h2>
+                                        <p className="text-sm text-[#737373]">"{deleteConfirm.name}"</p>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-[#737373] mb-6">
+                                    {deleteConfirm.type === 'project'
+                                        ? 'This will permanently delete the project and all its scripts. This cannot be undone.'
+                                        : 'This will permanently delete this script. This cannot be undone.'}
+                                </p>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setDeleteConfirm(null)}
+                                        className="flex-1 py-2.5 text-sm font-medium text-[#1A1A1A] border border-[#E5E5E5] rounded-lg hover:bg-[#F5F5F5]"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={confirmDelete}
+                                        disabled={isSubmitting}
+                                        className="flex-1 py-2.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+                                    >
+                                        {isSubmitting ? 'Deleting...' : 'Delete'}
+                                    </button>
+                                </div>
                             </div>
                         </motion.div>
                     </>
