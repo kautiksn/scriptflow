@@ -3,13 +3,15 @@
 import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
-import { ArrowLeft, Settings } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ArrowLeft, Edit2 } from 'lucide-react'
 import { logout } from '@/app/actions/auth'
-import { createComment } from '@/app/actions/admin'
+import { createComment, updateTabContent } from '@/app/actions/admin'
 import { TabBar } from '@/components/tab-bar'
 import { TabContent } from '@/components/tab-content'
 import { CommentDialog } from '@/components/comment-dialog'
 import { CommentTrigger } from '@/components/comment-trigger'
+import { ScriptEditor } from '@/components/script-editor'
 import { useTextSelection } from '@/hooks/use-text-selection'
 
 interface Tab {
@@ -54,7 +56,16 @@ function getUserColor(name: string): string {
     return USER_COLORS[hash % USER_COLORS.length]
 }
 
+interface ScriptBlock {
+    id: string
+    timecode: string
+    visual: string
+    audio: string
+    notes?: string
+}
+
 export function VideoContent({ video, user }: VideoContentProps) {
+    const router = useRouter()
     const [activeTabId, setActiveTabId] = useState(video.tabs[0]?.id || '')
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [dialogPosition, setDialogPosition] = useState({ x: 0, y: 0 })
@@ -63,6 +74,7 @@ export function VideoContent({ video, user }: VideoContentProps) {
     const [comments, setComments] = useState<Comment[]>(
         video.tabs.flatMap(tab => tab.comments)
     )
+    const [isEditorOpen, setIsEditorOpen] = useState(false)
 
     const { selection, clearSelection } = useTextSelection()
 
@@ -131,7 +143,20 @@ export function VideoContent({ video, user }: VideoContentProps) {
         setActiveSelectedText('')
     }, [])
 
+    const handleSaveScript = useCallback(async (blocks: ScriptBlock[]) => {
+        if (!activeTab || activeTab.tabType !== 'script') return
+
+        await updateTabContent(activeTab.id, { blocks })
+        router.refresh()
+    }, [activeTab, router])
+
     const isAdmin = user.role === 'krtva'
+    const isScriptTab = activeTab?.tabType === 'script'
+
+    // Get current script blocks for editor
+    const currentScriptBlocks = isScriptTab && activeTab
+        ? ((activeTab.content as { blocks?: ScriptBlock[] })?.blocks || [])
+        : []
 
     return (
         <div className="min-h-screen bg-[#FAFAFA]">
@@ -162,10 +187,13 @@ export function VideoContent({ video, user }: VideoContentProps) {
                         </div>
 
                         <div className="flex items-center gap-2">
-                            {isAdmin && (
-                                <button className="flex items-center gap-2 px-4 py-2 text-sm text-[#737373] hover:text-[#1A1A1A] border border-[#E5E5E5] rounded-lg hover:bg-[#F5F5F5] transition-all-200">
-                                    <Settings className="w-4 h-4" />
-                                    Edit
+                            {isAdmin && isScriptTab && (
+                                <button
+                                    onClick={() => setIsEditorOpen(true)}
+                                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#1A1A1A] rounded-lg hover:bg-black transition-all-200"
+                                >
+                                    <Edit2 className="w-4 h-4" />
+                                    Edit Script
                                 </button>
                             )}
                             <form action={logout}>
@@ -220,6 +248,17 @@ export function VideoContent({ video, user }: VideoContentProps) {
                 authorName={user.name}
                 authorColor={userColor}
             />
+
+            {/* Script Editor */}
+            {isAdmin && (
+                <ScriptEditor
+                    isOpen={isEditorOpen}
+                    onClose={() => setIsEditorOpen(false)}
+                    onSave={handleSaveScript}
+                    initialBlocks={currentScriptBlocks}
+                    title={`Edit: ${activeTab?.title || 'Script'}`}
+                />
+            )}
         </div>
     )
 }
