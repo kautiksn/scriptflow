@@ -65,6 +65,20 @@ export async function deleteProject(projectId: string) {
     return { success: true }
 }
 
+export async function updateProject(projectId: string, data: { title?: string }) {
+    await verifyAdmin()
+
+    await prisma.project.update({
+        where: { id: projectId },
+        data: {
+            ...(data.title && { title: data.title }),
+        },
+    })
+
+    revalidatePath('/dashboard')
+    return { success: true }
+}
+
 // ===== VIDEOS =====
 
 export async function createVideo(formData: FormData) {
