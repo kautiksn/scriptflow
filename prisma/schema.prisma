@@ -32,8 +32,8 @@ enum Role {
 model Project {
   id        String   @id @default(uuid())
   title     String
-  clientId  String   @map("client_id")
-  client    User     @relation(fields: [clientId], references: [id])
+  clientId  String?  @map("client_id")
+  client    User?    @relation(fields: [clientId], references: [id])
   createdAt DateTime @default(now()) @map("created_at")
   videos    Video[]
 

@@ -10,11 +10,11 @@ export default async function DashboardPage() {
         redirect('/login')
     }
 
-    // Get projects with videos for this client
+    // Admin sees all projects, clients see only their own
+    const isAdmin = session.role === 'krtva'
+
     const projects = await prisma.project.findMany({
-        where: {
-            clientId: session.userId,
-        },
+        where: isAdmin ? {} : { clientId: session.userId },
         include: {
             videos: {
                 orderBy: { displayOrder: 'asc' },
