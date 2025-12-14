@@ -190,7 +190,7 @@ export function VideoContent({ video, user }: VideoContentProps) {
                             {isAdmin && isScriptTab && (
                                 <button
                                     onClick={() => setIsEditorOpen(true)}
-                                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#1A1A1A] rounded-lg hover:bg-black transition-all-200"
+                                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all-200 animate-pulse-subtle"
                                 >
                                     <Edit2 className="w-4 h-4" />
                                     Edit Script
